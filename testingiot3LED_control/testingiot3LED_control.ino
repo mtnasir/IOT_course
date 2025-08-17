@@ -9,7 +9,7 @@ const char* password = "******";  // Replace with your WiFi password
 WebServer server(80);
 
 // LED pin
-const int ledPin = 2; // GPIO2 (D2) for the LED
+const int ledPin = 2; // GPIO2  (D2) for the LED
 
 // Function prototypes
 void handleRoot();
