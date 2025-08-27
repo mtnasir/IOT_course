@@ -13,17 +13,12 @@
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
 #include <time.h>
-#include <sys/time.h>  // optional (not strictly needed, mirrors code2)
 
-#include "secret.h"
+#include "secrets.h"
 
 // ========== Pins ==========
 const int LED_PIN = 2;   // Built-in LED on many ESP32 boards
 
-// ========== PWM (LEDC) ==========
-const int PWM_CHANNEL  = 0;
-const int PWM_FREQ_HZ  = 1000;
-const int PWM_RES_BITS = 8; // duty: 0..255
 
 // ========== MQTT Topic ==========
 static const char TOPIC_PWM[] = "PWM";
@@ -50,37 +45,22 @@ void connectWiFi() {
   Serial.println(WiFi.localIP());
 }
 
-// ========== Time Sync (updated to match code2) ==========
-// Robust SNTP time sync with configTime(), prints ISO-8601 UTC timestamp
+// TLS needs correct time to validate server certs
 void syncTime() {
-  Serial.println("Fetching time from NTP via SNTP...");
-  // Use multiple reliable servers
-  configTime(0, 0, "pool.ntp.org", "time.google.com");
-
-  struct tm tm_info;
-  bool ok = false;
-
-  // Wait up to ~30 seconds in 1s chunks for SNTP to set time
-  for (int i = 0; i < 30; i++) {
-    if (getLocalTime(&tm_info, 1000)) { // waits up to 1s each iteration
-      ok = true;
-      break;
-    }
-    Serial.print(".");
-  }
-
-  if (!ok) {
-    Serial.println("\nNTP sync failed; restarting...");
-    delay(1000);
-    ESP.restart();
-  }
-
-  // At this point, system time is set (UTC)
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Syncing time");
   time_t now = time(nullptr);
-  char ts[25];
-  strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
-  Serial.print("Current UTC time: ");
-  Serial.println(ts);
+  int retries = 0;
+  while (now < 8 * 3600 * 2 && retries < 60) { // wait until > ~1970-01-02
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+    retries++;
+  }
+  Serial.println();
+  struct tm timeinfo;
+  gmtime_r(&now, &timeinfo);
+  Serial.printf("Time synced: %s", asctime(&timeinfo));
 }
 
 // ========== MQTT callback ==========
@@ -105,7 +85,7 @@ void onMessage(char* topic, byte* payload, unsigned int length) {
     if (duty < 0) duty = 0;
     if (duty > 255) duty = 255;
 
-    ledcWrite(PWM_CHANNEL, duty);
+    analogWrite(2, duty);
     Serial.printf("Set PWM duty to %d on LED pin %d\n", duty, LED_PIN);
   }
 }
@@ -133,13 +113,8 @@ void setup() {
   Serial.begin(115200);
   delay(100);
 
-  // PWM setup on LED pin
-  ledcSetup(PWM_CHANNEL, PWM_FREQ_HZ, PWM_RES_BITS);
-  ledcAttachPin(LED_PIN, PWM_CHANNEL);
-  ledcWrite(PWM_CHANNEL, 0); // start off
-
   connectWiFi();
-  syncTime(); // Do SNTP sync (sets system UTC time) before TLS/MQTT
+  syncTime();
 
   // TLS credentials
   net.setCACert(AWS_ROOT_CA);
