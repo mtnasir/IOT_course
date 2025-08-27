@@ -10,7 +10,7 @@ static const char AWS_IOT_ENDPOINT[] = "your-endpoint-ats.iot.us-east-1.amazonaw
 static const int  AWS_IOT_PORT      = 8883;
 
 // MQTT Client ID (ThingName). Set to match your policy (e.g., IOTcourse1).
-static const char THING_NAME[] = "IOTcourse1";
+static const char THING_NAME[] = "IOTcourse1"; // Change to your ThingName
 
 // ========== Certificates / Keys (PEM) ==========
 // Paste full PEM contents including BEGIN/END lines between the markers.
